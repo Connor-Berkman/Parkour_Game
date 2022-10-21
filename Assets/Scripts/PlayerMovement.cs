@@ -28,6 +28,13 @@ public class PlayerMovement : MonoBehaviour
     private float threshold = 0.01f;
     public float maxSlopeAngle = 35f;
 
+    //Wallrunning
+    public LayerMask whatIsWall;
+    public float wallrunForce, maxWallrunTime, maxWallSpeed;
+    bool isWallRight, isWallLeft;
+    bool isWallRunning;
+    public float maxWallRunCameraTilt, wallRunCameraTilt;
+
     //Crouch & Slide
     private Vector3 crouchScale = new Vector3(1, 0.5f, 1);
     private Vector3 playerScale;
@@ -69,6 +76,8 @@ public class PlayerMovement : MonoBehaviour
     {
         MyInput();
         Look();
+        CheckForWall();
+        WallRunInput();
     }
 
     /// <summary>
@@ -158,7 +167,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void Jump()
     {
-        if (grounded && readyToJump)
+        if (grounded)
         {
             readyToJump = false;
 
@@ -175,7 +184,47 @@ public class PlayerMovement : MonoBehaviour
 
             Invoke(nameof(ResetJump), jumpCooldown);
         }
+        if (!grounded)
+        {
+            readyToJump = false;
+
+            //Add jump forces
+            rb.AddForce(orientation.forward * jumpForce * 1f);
+            rb.AddForce(Vector2.up * jumpForce * 1.5f);
+            rb.AddForce(normalVector * jumpForce * 0.5f);
+
+            //reset velocity
+            rb.velocity = Vector3.zero;
+
+            Invoke(nameof(ResetJump), jumpCooldown);
+        }
+        if (isWallRunning)
+        {
+            readyToJump = false;
+
+            if (isWallLeft && !Input.GetKey(KeyCode.D) || isWallRight && !Input.GetKey(KeyCode.A))
+            {
+                rb.AddForce(Vector2.up * jumpForce * 1.5f);
+                rb.AddForce(normalVector * jumpForce * 0.5f);
+            }
+
+            //sidewards wallhop
+            if (isWallRight || isWallLeft && Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.D)) rb.AddForce(-orientation.up * jumpForce * 1f);
+            if (isWallRight && Input.GetKey(KeyCode.A)) rb.AddForce(-orientation.right * jumpForce * 3.2f);
+            if (isWallLeft && Input.GetKey(KeyCode.D)) rb.AddForce(orientation.right * jumpForce * 3.2f);
+
+            //always add forward force
+            rb.AddForce(orientation.forward * jumpForce * 1f);
+
+            //reset velocity
+            rb.velocity = Vector3.zero;
+
+            Invoke(nameof(ResetJump), jumpCooldown);
+
+        }
     }
+
+
 
     private void ResetJump()
     {
@@ -197,8 +246,22 @@ public class PlayerMovement : MonoBehaviour
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
 
         //Perform the rotations
-        playerCam.transform.localRotation = Quaternion.Euler(xRotation, desiredX, 0);
+        playerCam.transform.localRotation = Quaternion.Euler(xRotation, desiredX, wallRunCameraTilt);
         orientation.transform.localRotation = Quaternion.Euler(0, desiredX, 0);
+
+        //while WallRunning
+        if (Math.Abs(wallRunCameraTilt) < maxWallRunCameraTilt && isWallRunning && isWallRight)
+            wallRunCameraTilt += Time.deltaTime * maxWallRunCameraTilt * 2;
+        if (Math.Abs(wallRunCameraTilt) < maxWallRunCameraTilt && isWallRunning && isWallLeft)
+            wallRunCameraTilt -= Time.deltaTime * maxWallRunCameraTilt * 2;
+
+        //tilts cam back again
+        if (wallRunCameraTilt > 0 && !isWallRight && !isWallLeft)
+            wallRunCameraTilt -= Time.deltaTime * maxWallRunCameraTilt * 2;
+        if (wallRunCameraTilt < 0 && !isWallRight && !isWallLeft)
+            wallRunCameraTilt += Time.deltaTime * maxWallRunCameraTilt * 2;
+
+
     }
 
     private void CounterMovement(float x, float y, Vector2 mag)
@@ -294,6 +357,48 @@ public class PlayerMovement : MonoBehaviour
     private void StopGrounded()
     {
         grounded = false;
+    }
+
+    private void WallRunInput()
+    {
+        //start Wallrun
+        if (Input.GetKey(KeyCode.D) && isWallRight) StartWallRun();
+        if (Input.GetKey(KeyCode.A) && isWallLeft) StartWallRun();
+
+    }
+
+    private void StartWallRun()
+    {
+        rb.useGravity = false;
+        isWallRunning = true;
+
+        if (rb.velocity.magnitude <= maxWallSpeed)
+        {
+            rb.AddForce(orientation.forward * wallrunForce * Time.deltaTime);
+
+            //Make sure char sticks to wall
+            if (isWallRight)
+                rb.AddForce(orientation.right * wallrunForce / 5 * Time.deltaTime);
+            else
+                rb.AddForce(-orientation.right * wallrunForce / 5 * Time.deltaTime);
+
+
+        }
+    }
+
+    private void StopWallRun()
+    {
+        rb.useGravity = true;
+        isWallRunning = false;
+    }
+
+    private void CheckForWall()
+    {
+        isWallRight = Physics.Raycast(transform.position, orientation.right, 1f, whatIsWall);
+        isWallLeft = Physics.Raycast(transform.position, -orientation.right, 1f, whatIsWall);
+
+        //leave wall run
+        if (!isWallLeft && !isWallRight) StopWallRun();
     }
 
 }
