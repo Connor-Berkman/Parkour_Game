@@ -184,20 +184,7 @@ public class PlayerMovement : MonoBehaviour
 
             Invoke(nameof(ResetJump), jumpCooldown);
         }
-        if (!grounded)
-        {
-            readyToJump = false;
-
-            //Add jump forces
-            rb.AddForce(orientation.forward * jumpForce * 1f);
-            rb.AddForce(Vector2.up * jumpForce * 1.5f);
-            rb.AddForce(normalVector * jumpForce * 0.5f);
-
-            //reset velocity
-            rb.velocity = Vector3.zero;
-
-            Invoke(nameof(ResetJump), jumpCooldown);
-        }
+       
         if (isWallRunning)
         {
             readyToJump = false;
@@ -232,6 +219,7 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private float desiredX;
+
     private void Look()
     {
         float mouseX = Input.GetAxis("Mouse X") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
@@ -399,6 +387,8 @@ public class PlayerMovement : MonoBehaviour
 
         //leave wall run
         if (!isWallLeft && !isWallRight) StopWallRun();
+
+
     }
 
 }
